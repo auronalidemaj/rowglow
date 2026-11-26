@@ -19,7 +19,7 @@ Built with [Tauri 2](https://tauri.app): a Rust core (`apps/desktop/src-tauri`) 
 
 ## Download
 
-Installers for macOS (Apple Silicon and Intel), Windows and Linux are on the [Releases](../../releases) page (website: rowglow.com, coming soon). Every feature is free in official builds until February 1, 2027.
+Installers for macOS (Apple Silicon and Intel), Windows and Linux are published on the [Releases](../../releases) page. Every feature is free in official builds until February 1, 2027.
 
 Or build it yourself: see [Building from source](#building-from-source).
 
@@ -56,14 +56,14 @@ The bridge only exists in this dev binary, binds to 127.0.0.1 and only accepts r
 ### Build the Mac app
 ```bash
 cd apps/desktop
-ROWGLOW_API_BASE=https://your-domain.com pnpm tauri build
+pnpm tauri build                 # optional: ROWGLOW_API_BASE=https://… for update checks
 ```
 Outputs `src-tauri/target/release/bundle/macos/Rowglow.app` and `bundle/dmg/Rowglow_<version>_aarch64.dmg`, ad-hoc signed (fine on your own Mac; a downloaded copy is blocked by Gatekeeper).
 `ROWGLOW_API_BASE` is the license/update server the app talks to (defaults to `http://localhost:3000` in debug builds; release builds contact **no** server unless it is set). Only debug builds can change it at runtime (Settings → Advanced); release builds always use the one they were built with.
 
 **For public downloads**, sign with your Developer ID and notarize. After the one-time Apple setup in [docs/MAC-SIGNING.md](docs/MAC-SIGNING.md):
 ```bash
-cp scripts/release-mac.env.example scripts/release-mac.env   # website URL + Apple key IDs (no secrets)
+cp scripts/release-mac.env.example scripts/release-mac.env   # Apple key IDs, optional update server (no secrets)
 scripts/release-mac.sh --check                              # what's missing
 scripts/release-mac.sh                                      # build, sign, notarize and staple the .app and .dmg, then verify
 scripts/release-mac.sh --target universal-apple-darwin      # Intel + Apple Silicon in one DMG (needs rustup)
@@ -75,7 +75,7 @@ The same code builds on every OS; build on the OS you're targeting (Tauri doesn'
 ```bash
 cd apps/desktop
 pnpm install
-ROWGLOW_API_BASE=https://your-domain.com pnpm tauri build
+pnpm tauri build                 # optional: ROWGLOW_API_BASE=https://… for update checks
 ```
 | OS | Installers in `src-tauri/target/release/bundle/` |
 |---|---|
@@ -96,7 +96,7 @@ Windows installers are unsigned, so SmartScreen warns on first run until you sig
 
 - **Test build:** Actions → Desktop release → Run workflow. Installers are attached to the run as artifacts.
 - **Release:** bump the version in `apps/desktop/src-tauri/tauri.conf.json`, `apps/desktop/src-tauri/Cargo.toml` and `apps/desktop/package.json`, then push a tag like `v1.2.1`. The workflow creates a **draft** GitHub release with every installer.
-- Configuration (Settings → Secrets and variables → Actions): the `ROWGLOW_API_BASE` variable (required for builds; the update/license server URL) and, for signed Mac builds, the Apple secrets in [docs/MAC-SIGNING.md](docs/MAC-SIGNING.md). Tag builds refuse to publish a Mac build that isn't signed and notarized.
+- Configuration (Settings → Secrets and variables → Actions): optionally the `ROWGLOW_API_BASE` variable (an update/license server URL; without it the installers contact no server) and, for signed Mac builds, the Apple secrets in [docs/MAC-SIGNING.md](docs/MAC-SIGNING.md). Tag builds refuse to publish a Mac build that isn't signed and notarized.
 
 ### Tests
 From the repository root. The unit tests need nothing else. The live tests (`ROWGLOW_IT=1`) also need a local PostgreSQL (your OS user, no password) and MySQL (`root`, no password) on the default ports, with the demo databases from `seed-demo.sh`, plus Docker for the rest:

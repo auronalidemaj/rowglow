@@ -66,7 +66,7 @@ cp scripts/release-mac.env.example scripts/release-mac.env   # then fill it in
 scripts/release-mac.sh --check
 ```
 
-`release-mac.env` holds no secrets (it's git-ignored anyway): the website URL, optionally the
+`release-mac.env` holds no secrets (it's git-ignored anyway): optionally the update server URL, optionally the
 certificate name, and either the API key ID + issuer ID or your Apple ID + team ID. `--check`
 builds nothing and calls no server; it lists what's still missing.
 

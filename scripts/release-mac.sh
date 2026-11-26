@@ -162,9 +162,8 @@ resolve_api_base() {
   case "${ROWGLOW_API_BASE:-}" in
     https://?*) ok "License/update server: $ROWGLOW_API_BASE" ;;
     "")
-      bad "ROWGLOW_API_BASE isn't set"
-      note "Your website's URL (https://…). It's built into the app for license activation and update checks."
-      return 1
+      # Optional: without a server the app makes no network calls of its own.
+      warn "No update server (ROWGLOW_API_BASE): this build won't check for updates or activate licenses"
       ;;
     *) bad "ROWGLOW_API_BASE must start with https:// (got $ROWGLOW_API_BASE)"; return 1 ;;
   esac
