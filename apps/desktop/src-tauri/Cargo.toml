@@ -1,0 +1,84 @@
+[package]
+name = "rowglow"
+version = "1.2.0"
+license = "AGPL-3.0-only"
+description = "Rowglow — ask your data anything"
+authors = ["Rowglow"]
+edition = "2021"
+default-run = "rowglow"
+
+[lib]
+name = "rowglow_lib"
+crate-type = ["rlib"]
+
+[[bin]]
+name = "rowglow"
+path = "src/main.rs"
+
+[[bin]]
+name = "rowglow-bridge"
+path = "src/bin/rowglow-bridge.rs"
+required-features = ["bridge"]
+
+[features]
+default = []
+bridge = ["dep:axum", "dep:tower-http"]
+axum = ["dep:axum"]
+tower-http = ["dep:tower-http"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+axum = { version = "0.8.9", optional = true }
+base64 = "0.22"
+chrono = "0.4.45"
+csv = "1.4.0"
+dirs = "7.0.0"
+duckdb = { version = "1.20000.2", features = ["bundled", "parquet", "json"] }
+ed25519-dalek = "2"
+futures-util = "0.3.34"
+# Per-OS credential stores (keyring gates each backend by target_os itself):
+# macOS Keychain, Windows Credential Manager, and on Linux the freedesktop
+# Secret Service (GNOME Keyring / KWallet, via libdbus). Not `linux-native`:
+# kernel keyutils is wiped on logout/reboot, which would lose saved passwords.
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust"] }
+machine-uid = "0.6.0"
+mongodb = "3.10.1"
+mysql_async = { version = "0.37.1", default-features = false, features = ["default-rustls-ring"] }
+redis = { version = "1.8.2", features = ["tokio-comp", "tokio-rustls-comp", "tls-rustls-insecure", "cluster-async", "sentinel"] }
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "form", "query", "rustls-no-provider"] }
+rusqlite = { version = "0.43.0", features = ["bundled", "column_decltype"] }
+russh = { version = "0.65.2", default-features = false, features = ["ring", "flate2", "rsa"] }
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+thiserror = "2.0.21"
+tiberius = { version = "0.13.0", default-features = false, features = ["tds73", "rustls", "chrono", "winauth"] }
+tokio = { version = "1.54.1", features = ["full"] }
+tokio-postgres = "0.7.18"
+tokio-postgres-rustls = "0.14.0"
+tokio-util = { version = "0.7.20", features = ["compat"] }
+tower-http = { version = "0.7.1", features = ["cors"], optional = true }
+url = "2.5.8"
+uuid = { version = "1.29.3", features = ["v4"] }
+
+[target.'cfg(windows)'.dependencies]
+# Process image paths (Local Radar) and the OS version (telemetry).
+windows-sys = { version = "0.61", features = [
+    "Wdk_System_SystemServices",
+    "Win32_Foundation",
+    "Win32_System_SystemInformation",
+    "Win32_System_Threading",
+] }
+
+[profile.release]
+# Smaller, faster release builds: no symbols in the shipped binary, cross-crate inlining.
+strip = true
+lto = "thin"
+codegen-units = 1

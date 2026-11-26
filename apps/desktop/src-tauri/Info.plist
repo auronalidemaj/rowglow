@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Merged into Rowglow.app/Contents/Info.plist by the Tauri bundler. -->
+<plist version="1.0">
+<dict>
+  <!-- macOS 15+ asks before an app connects to devices on the local network
+       (a database server at 192.168.x.x, for example); this is the reason it shows. -->
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Rowglow connects to the database servers on your network that you add.</string>
+</dict>
+</plist>

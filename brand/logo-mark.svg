@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Rowglow "row lantern": a lantern whose glass is made of table rows, the middle row lit. -->
+  <path d="M26 14.5a6 6 0 0 1 12 0" stroke="#9AA2AF" stroke-width="3.2" stroke-linecap="round"/>
+  <rect x="21.5" y="16.5" width="21" height="5.5" rx="2.75" fill="#9AA2AF"/>
+  <rect x="17.5" y="24" width="29" height="25" rx="6.5" fill="#F2A93B" fill-opacity="0.12" stroke="#F2A93B" stroke-width="3.4"/>
+  <rect x="23.5" y="29.75" width="17" height="3" rx="1.5" fill="#F2A93B" fill-opacity="0.45"/>
+  <rect x="23.5" y="34.75" width="17" height="4.5" rx="2.25" fill="#FFD58A"/>
+  <rect x="23.5" y="41.25" width="17" height="3" rx="1.5" fill="#F2A93B" fill-opacity="0.45"/>
+  <rect x="20.5" y="51" width="23" height="4.5" rx="2.25" fill="#9AA2AF"/>
+</svg>

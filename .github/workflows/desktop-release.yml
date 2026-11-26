@@ -1,0 +1,286 @@
+name: Desktop release
+
+# Builds the Rowglow desktop app (apps/desktop) for every platform:
+#   macOS Apple Silicon + Intel (.dmg), Windows x64 (.exe NSIS installer + .msi),
+#   Linux x64 (.deb, .rpm, .AppImage).
+#
+# - Push a tag like `v1.0.1`  → tests, builds, and attaches every installer to a
+#   DRAFT GitHub release. Test the installers, then publish the draft by hand.
+# - Run manually (Actions → Desktop release → Run workflow) → tests and builds;
+#   installers are uploaded as workflow artifacts only (no release).
+#
+# Configuration (Settings → Secrets and variables → Actions):
+#   ROWGLOW_API_BASE  variable (or secret), REQUIRED for builds: your website's
+#                   URL, e.g. https://getrowglow.com. It's baked into the binary for
+#                   license activation, update checks and telemetry. The build
+#                   stops if it's missing, so an installer never ships without it.
+#   APPLE_*           optional secrets for Developer ID signing + notarization;
+#                     without them macOS builds are ad-hoc signed. Which ones:
+#                     docs/MAC-SIGNING.md. With them, the app AND the .dmg are
+#                     notarized and stapled (the DMG by scripts/release-mac.sh).
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write # create the draft release and upload installers to it
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  ROWGLOW_API_BASE: ${{ vars.ROWGLOW_API_BASE || secrets.ROWGLOW_API_BASE }}
+  CARGO_TERM_COLOR: always
+  PNPM_VERSION: '12'
+  NODE_VERSION: '24'
+  LINUX_DEPS: libwebkit2gtk-4.1-dev libxdo-dev libdbus-1-dev librsvg2-dev patchelf file build-essential
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y $LINUX_DEPS
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+          key: test
+
+      - name: UI typecheck, build and unit tests
+        working-directory: apps/desktop
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build   # tsc --noEmit + vite build (also produces dist/ for the Rust build)
+          pnpm test
+
+      - name: Rust unit tests
+        working-directory: apps/desktop/src-tauri
+        run: cargo test --lib
+
+  create-release:
+    name: Create draft release
+    if: github.ref_type == 'tag'
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.release.outputs.result }}
+    steps:
+      - id: release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = context.ref.replace('refs/tags/', '');
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: tag,
+              name: `Rowglow ${tag.replace(/^v/, '')}`,
+              body: [
+                'Draft created by the Desktop release workflow. Test the installers, then publish.',
+                '',
+                '- macOS: `Rowglow_*_aarch64.dmg` (Apple Silicon), `Rowglow_*_x64.dmg` (Intel)',
+                '- Windows: `Rowglow_*_x64-setup.exe` (recommended) or `Rowglow_*_x64_en-US.msi`',
+                '- Linux: `.AppImage` (any distro), `.deb` (Debian/Ubuntu), `.rpm` (Fedora/openSUSE)',
+              ].join('\n'),
+              draft: true,
+              prerelease: false,
+            });
+            return data.id;
+
+  build:
+    name: Build (${{ matrix.name }})
+    needs: [test, create-release]
+    # Run for manual dispatches too, where create-release is skipped.
+    if: ${{ !cancelled() && needs.test.result == 'success' && needs.create-release.result != 'failure' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS Apple Silicon
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - name: macOS Intel
+            os: macos-latest
+            target: x86_64-apple-darwin
+          - name: Windows x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - name: Linux x64
+            # Oldest supported runner = oldest glibc = widest Linux compatibility.
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Require the license/update server URL
+        run: |
+          if [[ ! "$ROWGLOW_API_BASE" =~ ^https:// ]]; then
+            echo "::error::Set the ROWGLOW_API_BASE repository variable to your website URL (https://…) before building installers."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y $LINUX_DEPS
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+          key: ${{ matrix.target }}
+
+      - name: Install UI dependencies
+        working-directory: apps/desktop
+        run: pnpm install --frozen-lockfile
+
+      - name: Use Apple signing secrets when configured
+        id: apple
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # The certificate, its password and its name go together: the bundler
+          # imports the .p12 into a temporary keychain and signs with that name.
+          sign=0
+          [ -n "$APPLE_CERTIFICATE" ] && sign=$((sign + 1))
+          [ -n "$APPLE_CERTIFICATE_PASSWORD" ] && sign=$((sign + 1))
+          [ -n "$APPLE_SIGNING_IDENTITY" ] && sign=$((sign + 1))
+          if [ "$sign" -ne 0 ] && [ "$sign" -ne 3 ]; then
+            echo "::error::Set all three of APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD and APPLE_SIGNING_IDENTITY, or none."
+            exit 1
+          fi
+          notarize=false
+          if [ -n "$APPLE_API_KEY" ] && [ -n "$APPLE_API_ISSUER" ] && [ -n "$APPLE_API_KEY_P8" ]; then
+            # The bundler and notarytool read the API key from a file.
+            key_path="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY}.p8"
+            printf '%s\n' "$APPLE_API_KEY_P8" > "$key_path"
+            chmod 600 "$key_path"
+            echo "APPLE_API_KEY_PATH=$key_path" >> "$GITHUB_ENV"
+            notarize=true
+          elif [ -n "$APPLE_ID" ] && [ -n "$APPLE_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            notarize=true
+          fi
+          if [ "$sign" -eq 3 ] && [ "$notarize" = false ]; then
+            echo "::warning::Signing without notarization credentials: Gatekeeper will still block the downloaded app. Add APPLE_API_KEY, APPLE_API_ISSUER and APPLE_API_KEY_P8 (see docs/MAC-SIGNING.md)."
+          fi
+          if [ "$sign" -eq 0 ]; then notarize=false; fi
+          # Releases (tag pushes) must be signed and notarized: an ad-hoc DMG is blocked
+          # by Gatekeeper on every customer's Mac. Manual test runs may skip it.
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$notarize" != "true" ]; then
+            echo "::error::Release builds need Developer ID signing and notarization. Add the Apple secrets (docs/MAC-SIGNING.md), or use Run workflow for an unsigned test build."
+            exit 1
+          fi
+          # Only export what is set: empty APPLE_* variables would make the Tauri
+          # bundler try (and fail) to sign. Unset → ad-hoc signature from tauri.conf.json.
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_API_KEY APPLE_API_ISSUER APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            value="${!name}"
+            if [ -n "$value" ]; then
+              { echo "$name<<__ROWGLOW_EOF__"; echo "$value"; echo "__ROWGLOW_EOF__"; } >> "$GITHUB_ENV"
+            fi
+          done
+          echo "notarize=$notarize" >> "$GITHUB_OUTPUT"
+
+      - name: Build installers
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/desktop
+          tauriScript: pnpm tauri
+          args: --target ${{ matrix.target }}
+          # Empty on manual runs → build only, nothing is uploaded to a release.
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+
+      # The bundler notarizes and staples the .app; the .dmg around it gets the
+      # same treatment here so Gatekeeper accepts the download itself, offline too.
+      - name: Notarize and staple the DMG
+        if: runner.os == 'macOS' && steps.apple.outputs.notarize == 'true'
+        run: |
+          shopt -s nullglob
+          dmgs=(apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg)
+          if [ ${#dmgs[@]} -ne 1 ]; then echo "::error::Expected one DMG, found ${#dmgs[@]}"; exit 1; fi
+          scripts/release-mac.sh --notarize-dmg "${dmgs[0]}"
+          echo "DMG_PATH=${dmgs[0]}" >> "$GITHUB_ENV"
+
+      - name: Replace the release's DMG with the stapled one
+        if: runner.os == 'macOS' && steps.apple.outputs.notarize == 'true' && needs.create-release.outputs.release_id != ''
+        uses: actions/github-script@v7
+        env:
+          RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const { owner, repo } = context.repo;
+            const release_id = Number(process.env.RELEASE_ID);
+            const file = process.env.DMG_PATH;
+            const name = path.basename(file);
+            const assets = await github.paginate(github.rest.repos.listReleaseAssets, { owner, repo, release_id, per_page: 100 });
+            for (const asset of assets.filter((a) => a.name === name)) {
+              await github.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: asset.id });
+            }
+            await github.rest.repos.uploadReleaseAsset({
+              owner,
+              repo,
+              release_id,
+              name,
+              data: fs.readFileSync(file),
+              headers: { 'content-type': 'application/x-apple-diskimage', 'content-length': fs.statSync(file).size },
+            });
+            core.info(`Uploaded the notarized ${name}`);
+
+      - name: Upload installers as workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rowglow-${{ matrix.target }}
+          if-no-files-found: error
+          path: |
+            apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+            apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
+            apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi
+            apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/deb/*.deb
+            apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/rpm/*.rpm
+            apps/desktop/src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage

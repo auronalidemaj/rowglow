@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1D222B"/>
+      <stop offset="1" stop-color="#0B0D11"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#F2A93B" stop-opacity="0.45"/>
+      <stop offset="0.5" stop-color="#F2A93B" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#F2A93B" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#D2D7DE"/>
+      <stop offset="1" stop-color="#7F8794"/>
+    </linearGradient>
+    <linearGradient id="lit" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFE9B8"/>
+      <stop offset="1" stop-color="#F7B955"/>
+    </linearGradient>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  <rect x="100.5" y="100.5" width="823" height="823" rx="184.5" fill="none" stroke="#ffffff" stroke-opacity="0.08"/>
+  <circle cx="512" cy="559" r="330" fill="url(#halo)"/>
+  <g transform="translate(176 176) scale(10.5)">
+    <path d="M26 14.5a6 6 0 0 1 12 0" fill="none" stroke="url(#metal)" stroke-width="3.2" stroke-linecap="round"/>
+    <rect x="21.5" y="16.5" width="21" height="5.5" rx="2.75" fill="url(#metal)"/>
+    <rect x="17.5" y="24" width="29" height="25" rx="6.5" fill="#F2A93B" fill-opacity="0.16" stroke="#F2A93B" stroke-width="3.4"/>
+    <rect x="23.5" y="29.75" width="17" height="3" rx="1.5" fill="#F2A93B" fill-opacity="0.5"/>
+    <rect x="23.5" y="34.75" width="17" height="4.5" rx="2.25" fill="url(#lit)"/>
+    <rect x="23.5" y="41.25" width="17" height="3" rx="1.5" fill="#F2A93B" fill-opacity="0.5"/>
+    <rect x="20.5" y="51" width="23" height="4.5" rx="2.25" fill="url(#metal)"/>
+  </g>
+</svg>

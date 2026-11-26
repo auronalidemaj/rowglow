@@ -1,0 +1,16 @@
+node_modules/
+dist/
+target/
+*.tsbuildinfo
+.env
+.env*.local
+.DS_Store
+apps/desktop/src-tauri/gen/
+# Test databases and generated demo files
+scripts/.test-servers.env
+scripts/demo/*.sqlite
+scripts/demo/*.duckdb
+# Mac release settings and Apple keys (scripts/release-mac.sh)
+scripts/release-mac.env
+*.p8
+*.p12
